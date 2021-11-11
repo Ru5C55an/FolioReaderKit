@@ -187,7 +187,7 @@ extension Highlight {
     ///   - bookId: Book ID
     ///   - page: Page number
     /// - Returns: Return a list of Highlights
-    public static func allByBookId(withConfiguration readerConfig: FolioReaderConfig, bookId: String, andPage page: Int? = nil) -> [Highlight] {
+    public static func allByBookId(withConfiguration readerConfig: FolioReaderConfig, bookId: String, andPage page: NSNumber? = nil) -> [Highlight] {
         var highlights: [Highlight]?
         var predicate = NSPredicate(format: "bookId = %@", bookId)
         if let page = page {
