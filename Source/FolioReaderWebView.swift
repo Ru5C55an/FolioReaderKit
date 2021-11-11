@@ -23,7 +23,8 @@ open class FolioReaderWebView: WKWebView {
     }
 
     fileprivate var book: FRBook {
-        return BookProvider.shared.currentBook
+        guard let readerContainer = readerContainer else { return FRBook() }
+        return readerContainer.book
     }
 
     fileprivate var folioReader: FolioReader {
@@ -148,7 +149,7 @@ open class FolioReaderWebView: WKWebView {
     func remove(_ sender: UIMenuController?) {
         js("removeThisHighlight()") { [weak self] (callback, error) in
             guard error == nil, let removedId = callback as? String else { return }
-            DBAPIManager.shared.removeHighlight(byId: removedId)
+            Highlight.removeById(withConfiguration: self.readerConfig, highlightId: removedId)
             self?.setMenuVisible(false)
         }
     }
@@ -403,4 +404,57 @@ open class FolioReaderWebView: WKWebView {
             break
         }
     }
+}
+
+final class BookProvider: NSObject, WKURLSchemeHandler {
+
+    static let shared = BookProvider()
+
+    var currentBook = FRBook()
+
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        // TODO: may not need this anymore
+        guard let url = urlSchemeTask.request.url else { urlSchemeTask.didFailWithError(BookProviderURLProtocolError.urlNotExist)
+            return
+        }
+
+        let urlResponse = URLResponse(url: url, mimeType: nil, expectedContentLength: -1, textEncodingName: nil)
+        urlSchemeTask.didReceive(urlResponse)
+
+        guard url.absoluteString.hasPrefix(BookProvider.shared.currentBook.baseURL.absoluteString) else {
+
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            components?.scheme = "file"
+            if let fileUrl = components?.url,
+                let data = try? Data(contentsOf: fileUrl) {
+
+                urlSchemeTask.didReceive(data)
+                urlSchemeTask.didFinish()
+                return
+            }
+
+
+            print("WWWWWW - can't load bookprovider url\n\(url)")
+            urlSchemeTask.didFailWithError(BookProviderURLProtocolError.urlNotExist)
+            return
+        }
+
+        var hrefSubStr = url.absoluteString.dropFirst(BookProvider.shared.currentBook.baseURL.absoluteString.count)
+        if hrefSubStr.hasPrefix("/") {
+            hrefSubStr = hrefSubStr.dropFirst()
+        }
+        let href = String(hrefSubStr)
+        if let data = BookProvider.shared.currentBook.resources.findByHref(String(href))?.data {
+            urlSchemeTask.didReceive(data)
+        }
+        urlSchemeTask.didFinish()
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
+        // clean up
+    }
+}
+
+enum BookProviderURLProtocolError: Error {
+    case urlNotExist
 }
