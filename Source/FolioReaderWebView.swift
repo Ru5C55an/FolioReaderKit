@@ -164,8 +164,8 @@ open class FolioReaderWebView: WKWebView {
             do {
                 let json = try JSONSerialization.jsonObject(with: jsonData!, options: []) as! NSArray
                 let dic = json.firstObject as! [String: String]
-                guard let startLocation = dic["startOffset"],
-                      let endLocation = dic["endOffset"],
+                guard let startOffset = dic["startOffset"],
+                      let endOffset = dic["endOffset"],
                       let dictRect = dic["rect"],
                       let content = dic["content"] else {
                           return
@@ -181,14 +181,8 @@ open class FolioReaderWebView: WKWebView {
                       }
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let hightlight = Highlight()
-                hightlight.highlightId = identifier
-                hightlight.bookId = bookId
-                hightlight.content = content
-                hightlight.page = pageNumber
-                hightlight.type = strongSelf.folioReader.currentHighlightStyle
-                hightlight.startOffset = startLocation
-                hightlight.endOffset = endLocation
+                let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
+                let highlight = Highlight.matchHighlight(match)
                 highlight?.persist(withConfiguration: self.readerConfig)
 
             } catch {
@@ -208,8 +202,8 @@ open class FolioReaderWebView: WKWebView {
             do {
                 let json = try JSONSerialization.jsonObject(with: jsonData!, options: []) as! NSArray
                 let dic = json.firstObject as! [String: String]
-                guard let startLocation = dic["startOffset"],
-                      let endLocation = dic["endOffset"],
+                guard let startOffset = dic["startOffset"],
+                      let endOffset = dic["endOffset"],
                       let content = dic["content"] else {
                           return
                       }
@@ -219,15 +213,10 @@ open class FolioReaderWebView: WKWebView {
                 guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let highlight = Highlight()
-                highlight.highlightId = identifier
-                highlight.bookId = bookId
-                highlight.content = content
-                highlight.page = pageNumber
-                highlight.type = strongSelf.folioReader.currentHighlightStyle
-                highlight.startOffset = startLocation
-                highlight.endOffset = endLocation
-                strongSelf.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
+                let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
+                if let highlight = Highlight.matchHighlight(match) {
+                    self.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
+                }
             } catch {
                 print("Could not receive JSON")
             }
@@ -287,7 +276,7 @@ open class FolioReaderWebView: WKWebView {
 
     func changeHighlightStyle(_ sender: UIMenuController?, style: HighlightStyle) {
         self.folioReader.currentHighlightStyle = style.rawValue
-        
+
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
             guard error == nil, let updateId = callback as? String, let readerConfig == self?.readerConfig else { return }
             Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
