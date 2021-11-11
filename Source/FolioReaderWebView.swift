@@ -460,7 +460,7 @@ final class BookProvider: NSObject, WKURLSchemeHandler {
             hrefSubStr = hrefSubStr.dropFirst()
         }
         let href = String(hrefSubStr)
-        if let data = BookProvider.shared.currentBook.resources.findByHref(href)?.mediaType {
+        if let data = BookProvider.shared.currentBook.resources.findByHref(href)?.data {
             urlSchemeTask.didReceive(data)
         }
         urlSchemeTask.didFinish()
