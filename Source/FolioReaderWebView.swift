@@ -182,7 +182,7 @@ open class FolioReaderWebView: WKWebView {
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
                 let highlight = Highlight(id: identifier, bookId: bookId, content: content, page: pageNumber, type: strongSelf.folioReader.currentHighlightStyle, startLocation: startLocation, endLocation: endLocation)
-                DBAPIManager.shared.addHighlight(highlight: highlight)
+                highlight?.persist(withConfiguration: self.readerConfig)
 
             } catch {
                 print("Could not receive JSON")
@@ -224,8 +224,8 @@ open class FolioReaderWebView: WKWebView {
         js("getHighlightId()") { [weak self] (callback, error) in
             guard error == nil,
                   let highlightId = callback as? String else { return }
-            guard let highlightNote = DBAPIManager.shared.getHighlight(byId: highlightId) else { return }
-            self?.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
+            guard let highlightNote = Highlight.getById(withConfiguration: readerConfig, highlightId: highlightId) else { return }
+            self.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
         }
     }
 
@@ -275,8 +275,8 @@ open class FolioReaderWebView: WKWebView {
         self.folioReader.currentHighlightStyle = style.rawValue
 
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
-            guard error == nil, let updateId = callback as? String else { return }
-            DBAPIManager.shared.updateHighlight(id: updateId, type: style)
+            if let updateId = js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") {
+                Highlight.updateById(withConfiguration: self.readerConfig, highlightId: updateId, type: style)
 
             //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
             self?.setMenuVisible(false)
