@@ -180,13 +180,18 @@ open class FolioReaderWebView: WKWebView {
                           return
                       }
 
-                guard let html = self?.getStringWithJS("getHTML()") else { return }
-                let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
-                let highlight = Highlight.matchHighlight(match)
-                guard let readerConfig = self?.readerConfig else { return }
-                highlight?.persist(withConfiguration: readerConfig)
+                self?.js("getHTML()", completionHandler: { callback, error in
+                    guard error == nil, let html = callback as? String else {
+                        print("Error removing Highlight from page")
+                        return String
+                    }
 
+                    let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
+                    let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
+                    let highlight = Highlight.matchHighlight(match)
+                    guard let readerConfig = self?.readerConfig else { return }
+                    highlight?.persist(withConfiguration: readerConfig)
+                })
             } catch {
                 print("Could not receive JSON")
             }
@@ -211,14 +216,20 @@ open class FolioReaderWebView: WKWebView {
                       }
                 strongSelf.clearTextSelection()
 
-                guard let html = self?.getStringWithJS("getHTML()") else { return }
-                guard let identifier = dic["id"] else { return }
-                guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
+                self?.js("getHTML()", completionHandler: { callback, error in
+                    guard error == nil, let html = callback as? String else {
+                        print("Error removing Highlight from page")
+                        return String
+                    }
 
-                let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
-                if let highlight = Highlight.matchHighlight(match) {
-                    self?.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
+                    guard let identifier = dic["id"] else { return }
+                    guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
+
+                    let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
+                    let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
+                    if let highlight = Highlight.matchHighlight(match) {
+                        self?.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
+                    }
                 }
             } catch {
                 print("Could not receive JSON")
@@ -385,12 +396,6 @@ open class FolioReaderWebView: WKWebView {
 
     open func js(_ script: String, completionHandler: ((Any?, Error?) -> Void)? = nil) {
         evaluateJavaScript(script, completionHandler: completionHandler)
-    }
-
-    @discardableResult open func getStringWithJS(_ script: String) -> String? {
-        let callback = self.stringByEvaluatingJavaScript(from: script)
-        if callback!.isEmpty { return nil }
-        return callback
     }
 
     // MARK: WebView
