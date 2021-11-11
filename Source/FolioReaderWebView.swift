@@ -230,7 +230,7 @@ open class FolioReaderWebView: WKWebView {
                     if let highlight = Highlight.matchHighlight(match) {
                         self?.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
                     }
-                }
+                })
             } catch {
                 print("Could not receive JSON")
             }
@@ -460,7 +460,7 @@ final class BookProvider: NSObject, WKURLSchemeHandler {
             hrefSubStr = hrefSubStr.dropFirst()
         }
         let href = String(hrefSubStr)
-        if let data = BookProvider.shared.currentBook.resources.findByHref(href)?.data {
+        if let data = BookProvider.shared.currentBook.resources.findByHref(href)?.mediaType {
             urlSchemeTask.didReceive(data)
         }
         urlSchemeTask.didFinish()

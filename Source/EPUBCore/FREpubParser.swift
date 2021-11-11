@@ -129,6 +129,7 @@ class FREpubParser: NSObject, SSZipArchiveDelegate {
             throw FolioReaderError.fullPathEmpty
         }
         opfResource.mediaType = MediaType.by(fileName: fullPath)
+        opfResource.data = containerData
         book.opfResource = opfResource
         resourcesBasePath = bookBasePath.appendingPathComponent(book.opfResource.href.deletingLastPathComponent)
     }
@@ -137,11 +138,13 @@ class FREpubParser: NSObject, SSZipArchiveDelegate {
     ///
     /// - Parameter bookBasePath: The base book path
     /// - Throws: `FolioReaderError`
-    private func readOpf(with bookBasePath: String) throws {
-        let opfPath = bookBasePath.appendingPathComponent(book.opfResource.href)
+    private func readOpf() throws {
+        let opfPath = book.opfResource.href
         var identifier: String?
 
-        let opfData = try Data(contentsOf: URL(fileURLWithPath: opfPath), options: .alwaysMapped)
+        guard let opfData = (bookZipEntries.first { $0.info.name == opfPath })?.data else {
+            throw FolioReaderError.errorInOpf
+        }
         let xmlDoc = try AEXMLDocument(xml: opfData)
 
         // Base OPF info
@@ -153,15 +156,25 @@ class FREpubParser: NSObject, SSZipArchiveDelegate {
             }
         }
 
+        // initialize EpubCFI class
+        parseCFI(xmlDoc)
+
         // Parse and save each "manifest item"
-        xmlDoc.root["manifest"]["item"].all?.forEach {
+        xmlDoc.root["manifest"]["item"].all?.forEach { item in
+            guard let href = item.attributes["href"], let entry = self.bookZipEntries.first(where: { $0.info.name.contains(href) }) else {
+                return
+
+            }
             let resource = FRResource()
-            resource.id = $0.attributes["id"]
-            resource.properties = $0.attributes["properties"]
-            resource.href = $0.attributes["href"]
+            resource.id = item.attributes["id"]
+            resource.properties = item.attributes["properties"]
+            resource.href = entry.info.name
+            resource.data = entry.data
+
+            // TODO: check this
             resource.fullHref = resourcesBasePath.appendingPathComponent(resource.href).removingPercentEncoding
-            resource.mediaType = MediaType.by(name: $0.attributes["media-type"] ?? "", fileName: resource.href)
-            resource.mediaOverlay = $0.attributes["media-overlay"]
+            resource.mediaType = MediaType.by(name: item.attributes["media-type"] ?? "", fileName: resource.href)
+            resource.mediaOverlay = item.attributes["media-overlay"]
 
             // if a .smil file is listed in resources, go parse that file now and save it on book model
             if (resource.mediaType != nil && resource.mediaType == .smil) {
