@@ -278,8 +278,9 @@ open class FolioReaderWebView: WKWebView {
             if let updateId = js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") {
                 Highlight.updateById(withConfiguration: self.readerConfig, highlightId: updateId, type: style)
 
-            //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
-            self?.setMenuVisible(false)
+                //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
+                self?.setMenuVisible(false)
+            }
         }
     }
 
