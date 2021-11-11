@@ -161,7 +161,7 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
             return tempHtmlContent as String
         }
 
-        let highlights = Highlight.allByBookId(withConfiguration: self.readerConfig, bookId: bookId, andPage: pageNumber as NSNumber?)
+        let highlights = Highlight.allByBookId(withConfiguration: self.readerConfig, bookId: bookId, andPage: pageNumber)
 
         if (highlights.count > 0) {
             for item in highlights {
@@ -205,7 +205,7 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
             let style = HighlightStyle.classForStyle(highlight.type)
 
             let onClickAction = highlight.noteForHighlight == nil ? "callHighlightURL(this);" : "callHighlightWithNoteURL(this);"
-            webView?.js("recreateHighlight('\(highlight.id)','\(style)','\(onClickAction)','\(highlight.startLocation)','\(highlight.endLocation)')")
+            webView?.js("recreateHighlight('\(highlight.highlightId)','\(style)','\(onClickAction)','\(highlight.startOffset)','\(highlight.endOffset)')")
         }
     }
 

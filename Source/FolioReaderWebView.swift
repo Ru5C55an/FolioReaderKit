@@ -148,8 +148,8 @@ open class FolioReaderWebView: WKWebView {
 
     func remove(_ sender: UIMenuController?) {
         js("removeThisHighlight()") { [weak self] (callback, error) in
-            guard error == nil, let removedId = callback as? String else { return }
-            Highlight.removeById(withConfiguration: self.readerConfig, highlightId: removedId)
+            guard error == nil, let removedId = callback as? String, readerConfig = self?.readerConfig else { return }
+            Highlight.removeById(withConfiguration: readerConfig, highlightId: removedId)
             self?.setMenuVisible(false)
         }
     }
@@ -225,7 +225,7 @@ open class FolioReaderWebView: WKWebView {
             guard error == nil,
                   let highlightId = callback as? String else { return }
             guard let highlightNote = Highlight.getById(withConfiguration: readerConfig, highlightId: highlightId) else { return }
-            self.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
+            self?.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
         }
     }
 
@@ -276,7 +276,8 @@ open class FolioReaderWebView: WKWebView {
 
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
             if let updateId = js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") {
-                Highlight.updateById(withConfiguration: self.readerConfig, highlightId: updateId, type: style)
+                guard readerConfig == self?.readerConfig else { return }
+                Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
 
                 //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
                 self?.setMenuVisible(false)

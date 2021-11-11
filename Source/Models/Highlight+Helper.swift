@@ -290,7 +290,7 @@ extension Highlight {
     ///   - highlightId: The ID to be removed
     /// - Returns: The removed id
     ///
-    @discardableResult public static func removeFromHTMLById(withinPage page: FolioReaderPage?, , highlightId: String, completionHandler: ((String?) -> Void)? = nil) {
+    @discardableResult public static func removeFromHTMLById(withinPage page: FolioReaderPage?, highlightId: String, completionHandler: ((String?) -> Void)? = nil) {
         guard let currentPage = page else {
             completionHandler?(nil)
             return }
