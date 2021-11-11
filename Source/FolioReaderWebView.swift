@@ -183,7 +183,7 @@ open class FolioReaderWebView: WKWebView {
                 self?.js("getHTML()", completionHandler: { callback, error in
                     guard error == nil, let html = callback as? String else {
                         print("Error removing Highlight from page")
-                        return String
+                        return
                     }
 
                     let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
@@ -219,7 +219,7 @@ open class FolioReaderWebView: WKWebView {
                 self?.js("getHTML()", completionHandler: { callback, error in
                     guard error == nil, let html = callback as? String else {
                         print("Error removing Highlight from page")
-                        return String
+                        return
                     }
 
                     guard let identifier = dic["id"] else { return }
@@ -460,7 +460,7 @@ final class BookProvider: NSObject, WKURLSchemeHandler {
             hrefSubStr = hrefSubStr.dropFirst()
         }
         let href = String(hrefSubStr)
-        if let data = BookProvider.shared.currentBook.resources.findByHref(String(href))?.data {
+        if let data = BookProvider.shared.currentBook.resources.findByHref(href)?.data {
             urlSchemeTask.didReceive(data)
         }
         urlSchemeTask.didFinish()
