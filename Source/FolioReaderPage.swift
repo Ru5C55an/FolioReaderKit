@@ -9,6 +9,7 @@
 import UIKit
 import SafariServices
 import MenuItemKit
+import WebKit
 
 /// Protocol which is used from `FolioReaderPage`s.
 @objc public protocol FolioReaderPageDelegate: class {
@@ -35,7 +36,7 @@ import MenuItemKit
     @objc optional func pageTap(_ recognizer: UITapGestureRecognizer)
 }
 
-open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRecognizerDelegate {
+open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestureRecognizerDelegate {
     weak var delegate: FolioReaderPageDelegate?
     weak var readerContainer: FolioReaderContainer?
 
@@ -86,7 +87,7 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
             webView?.backgroundColor = .clear
             self.contentView.addSubview(webView!)
         }
-        webView?.delegate = self
+        webView?.navigationDelegate = self
 
         if colorView == nil {
             colorView = UIView()
@@ -145,7 +146,10 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
         let tempHtmlContent = htmlContentWithInsertHighlights(htmlContent)
         // Load the html into the webview
         webView?.alpha = 0
-        webView?.loadHTMLString(tempHtmlContent, baseURL: baseURL)
+        let headerString = "<meta name=\"viewport\" content=\"initial-scale=1.0\" />"
+        let documentDirUrl = try! FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+        webView?.loadFileURL(baseURL, allowingReadAccessTo: documentDirUrl)
+        webView?.loadHTMLString(headerString + tempHtmlContent, baseURL: baseURL)
     }
 
     // MARK: - Highlights
@@ -187,14 +191,14 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
         return tempHtmlContent as String
     }
 
-    // MARK: - UIWebView Delegate
-
-    open func webViewDidFinishLoad(_ webView: UIWebView) {
+    // MARK: - WKWebView Delegate
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard let webView = webView as? FolioReaderWebView else {
             return
         }
 
         delegate?.pageWillLoad?(self)
+        insertHighlights()
 
         // Add the custom class based onClick listener
         self.setupClassBasedOnClickListeners()
@@ -214,7 +218,7 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
         if (self.folioReader.readerCenter?.pageScrollDirection == direction &&
             self.folioReader.readerCenter?.isScrolling == true &&
             self.readerConfig.scrollDirection != .horizontalWithVerticalContent) {
-            scrollPageToBottom()
+            self.scrollPageToBottom()
         }
 
         UIView.animate(withDuration: 0.2, animations: {webView.alpha = 1}, completion: { finished in
@@ -222,40 +226,47 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
             self.webView?.createMenu(options: false)
         })
 
-        delegate?.pageDidLoad?(self)
-    }
-
-    open func webView(_ webView: UIWebView, shouldStartLoadWith request: URLRequest, navigationType: UIWebView.NavigationType) -> Bool {
-        guard
-            let webView = webView as? FolioReaderWebView,
-            let scheme = request.url?.scheme else {
-                return true
+        webView.js("document.readyState") { [weak self] (_, _) in
+            guard let self = self else { return }
+            self.delegate?.pageDidLoad?(self)
         }
 
-        guard let url = request.url else { return false }
+    }
+
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let request = navigationAction.request
+        let navigationType = navigationAction.navigationType
+
+        guard let webView = webView as? FolioReaderWebView,
+              let scheme = request.url?.scheme else {
+                  decisionHandler(.allow)
+                  return
+              }
+
+        guard let url = request.url else {
+            decisionHandler(.cancel)
+            return
+        }
 
         if scheme == "highlight" || scheme == "highlight-with-note" {
-            shouldShowBar = false
-
-            guard let decoded = url.absoluteString.removingPercentEncoding else { return false }
+            guard let decoded = url.absoluteString.removingPercentEncoding else { decisionHandler(.cancel); return }
             let index = decoded.index(decoded.startIndex, offsetBy: 12)
             let rect = NSCoder.cgRect(for: String(decoded[index...]))
 
             webView.createMenu(options: true)
             webView.setMenuVisible(true, andRect: rect)
-            menuIsVisible = true
-
-            return false
+            decisionHandler(.cancel)
+            return
         } else if scheme == "play-audio" {
-            guard let decoded = url.absoluteString.removingPercentEncoding else { return false }
+            guard let decoded = url.absoluteString.removingPercentEncoding else { decisionHandler(.cancel); return }
             let index = decoded.index(decoded.startIndex, offsetBy: 13)
             let playID = String(decoded[index...])
             let chapter = self.folioReader.readerCenter?.getCurrentChapter()
             let href = chapter?.href ?? ""
             self.folioReader.readerAudioPlayer?.playAudio(href, fragmentID: playID)
-
-            return false
-        } else if scheme == "file" {
+            decisionHandler(.cancel)
+            return
+        } else if scheme == "file" || scheme == "bookprovider" {
 
             let anchorFromURL = url.fragment
 
@@ -263,7 +274,8 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
             if !url.pathExtension.isEmpty {
                 let pathComponent = (self.book.opfResource.href as NSString?)?.deletingLastPathComponent
                 guard let base = ((pathComponent == nil || pathComponent?.isEmpty == true) ? self.book.name : pathComponent) else {
-                    return true
+                    decisionHandler(.allow)
+                    return
                 }
 
                 let path = url.path
@@ -271,7 +283,8 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
 
                 // Return to avoid crash
                 if (splitedPath.count <= 1 || splitedPath[1].isEmpty) {
-                    return true
+                    decisionHandler(.allow)
+                    return
                 }
 
                 let href = splitedPath[1].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -281,37 +294,42 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
                     // Handle internal #anchor
                     if anchorFromURL != nil {
                         handleAnchor(anchorFromURL!, avoidBeginningAnchors: false, animated: true)
-                        return false
+                        decisionHandler(.cancel)
+                        return
                     }
                 } else {
                     self.folioReader.readerCenter?.changePageWith(href: href, animated: true)
                 }
-                return false
+                decisionHandler(.cancel)
+                return
             }
 
             // Handle internal #anchor
             if anchorFromURL != nil {
                 handleAnchor(anchorFromURL!, avoidBeginningAnchors: false, animated: true)
-                return false
+                decisionHandler(.cancel)
+                return
             }
-
-            return true
+            decisionHandler(.allow)
+            return
         } else if scheme == "mailto" {
             print("Email")
-            return true
-        } else if url.absoluteString != "about:blank" && scheme.contains("http") && navigationType == .linkClicked {
+            decisionHandler(.allow)
+            return
+        } else if url.absoluteString != "about:blank" && scheme.contains("http") && navigationType == .linkActivated {
             let safariVC = SFSafariViewController(url: request.url!)
             safariVC.view.tintColor = self.readerConfig.tintColor
             self.folioReader.readerCenter?.present(safariVC, animated: true, completion: nil)
-            return false
+            decisionHandler(.cancel)
+            return
         } else {
             // Check if the url is a custom class based onClick listerner
             var isClassBasedOnClickListenerScheme = false
             for listener in self.readerConfig.classBasedOnClickListeners {
 
                 if scheme == listener.schemeName,
-                    let absoluteURLString = request.url?.absoluteString,
-                    let range = absoluteURLString.range(of: "/clientX=") {
+                   let absoluteURLString = request.url?.absoluteString,
+                   let range = absoluteURLString.range(of: "/clientX=") {
                     let baseURL = String(absoluteURLString[..<range.lowerBound])
                     let positionString = String(absoluteURLString[range.lowerBound...])
                     if let point = getEventTouchPoint(fromPositionParameterString: positionString) {
@@ -327,15 +345,17 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
             if isClassBasedOnClickListenerScheme == false {
                 // Try to open the url with the system if it wasn't a custom class based click listener
                 if UIApplication.shared.canOpenURL(url) {
-                    UIApplication.shared.openURL(url)
-                    return false
+                    UIApplication.shared.open(url)
+                    decisionHandler(.cancel)
+                    return
                 }
             } else {
-                return false
+                decisionHandler(.cancel)
+                return
             }
         }
-
-        return true
+        decisionHandler(.allow)
+        return
     }
 
     fileprivate func getEventTouchPoint(fromPositionParameterString positionParameterString: String) -> CGPoint? {
@@ -531,7 +551,7 @@ open class FolioReaderPage: UICollectionViewCell, UIWebViewDelegate, UIGestureRe
     
     // MARK: - Public Java Script injection
     
-    /** 
+    /**
      Runs a JavaScript script and returns it result. The result of running the JavaScript script passed in the script parameter, or nil if the script fails.
      
      - returns: The result of running the JavaScript script passed in the script parameter, or nil if the script fails.
