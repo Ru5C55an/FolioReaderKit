@@ -180,6 +180,7 @@ open class FolioReaderWebView: WKWebView {
                           return
                       }
 
+                guard let html = self?.js("getHTML()") else { return }
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
                 let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
                 let highlight = Highlight.matchHighlight(match)
@@ -209,7 +210,7 @@ open class FolioReaderWebView: WKWebView {
                       }
                 strongSelf.clearTextSelection()
 
-                guard let html = js("getHTML()") else { return }
+                guard let html = self?.js("getHTML()") else { return }
                 guard let identifier = dic["id"] else { return }
                 guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
 
