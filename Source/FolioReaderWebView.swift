@@ -148,7 +148,7 @@ open class FolioReaderWebView: WKWebView {
 
     func remove(_ sender: UIMenuController?) {
         js("removeThisHighlight()") { [weak self] (callback, error) in
-            guard error == nil, let removedId = callback as? String, readerConfig = self?.readerConfig else { return }
+            guard error == nil, let removedId = callback as? String, let readerConfig = self?.readerConfig else { return }
             Highlight.removeById(withConfiguration: readerConfig, highlightId: removedId)
             self?.setMenuVisible(false)
         }
@@ -181,7 +181,14 @@ open class FolioReaderWebView: WKWebView {
                       }
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let highlight = Highlight(id: identifier, bookId: bookId, content: content, page: pageNumber, type: strongSelf.folioReader.currentHighlightStyle, startLocation: startLocation, endLocation: endLocation)
+                let hightlight = Highlight()
+                hightlight.highlightId = identifier
+                hightlight.bookId = bookId
+                hightlight.content = content
+                hightlight.page = pageNumber
+                hightlight.type = strongSelf.folioReader.currentHighlightStyle
+                hightlight.startOffset = startLocation
+                hightlight.endOffset = endLocation
                 highlight?.persist(withConfiguration: self.readerConfig)
 
             } catch {
@@ -212,7 +219,14 @@ open class FolioReaderWebView: WKWebView {
                 guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
-                let highlight = Highlight(id: identifier, bookId: bookId, content: content, page: pageNumber, type: strongSelf.folioReader.currentHighlightStyle, startLocation: startLocation, endLocation: endLocation)
+                let highlight = Highlight()
+                highlight.highlightId = identifier
+                highlight.bookId = bookId
+                highlight.content = content
+                highlight.page = pageNumber
+                highlight.type = strongSelf.folioReader.currentHighlightStyle
+                highlight.startOffset = startLocation
+                highlight.endOffset = endLocation
                 strongSelf.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
             } catch {
                 print("Could not receive JSON")
@@ -223,7 +237,7 @@ open class FolioReaderWebView: WKWebView {
     @objc func updateHighlightNote(_ sender: UIMenuController?) {
         js("getHighlightId()") { [weak self] (callback, error) in
             guard error == nil,
-                  let highlightId = callback as? String else { return }
+                  let highlightId = callback as? Stringm let readerConfig = self?.readerConfig else { return }
             guard let highlightNote = Highlight.getById(withConfiguration: readerConfig, highlightId: highlightId) else { return }
             self?.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
         }
@@ -276,7 +290,7 @@ open class FolioReaderWebView: WKWebView {
 
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
             if let updateId = js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") {
-                guard readerConfig == self?.readerConfig else { return }
+                guard let readerConfig == self?.readerConfig else { return }
                 Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
 
                 //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
