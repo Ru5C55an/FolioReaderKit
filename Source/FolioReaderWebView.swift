@@ -164,8 +164,8 @@ open class FolioReaderWebView: WKWebView {
             do {
                 let json = try JSONSerialization.jsonObject(with: jsonData!, options: []) as! NSArray
                 let dic = json.firstObject as! [String: String]
-                guard let startLocation = dic["startLocation"],
-                      let endLocation = dic["endLocation"],
+                guard let startLocation = dic["startOffset"],
+                      let endLocation = dic["endOffset"],
                       let dictRect = dic["rect"],
                       let content = dic["content"] else {
                           return
@@ -208,8 +208,8 @@ open class FolioReaderWebView: WKWebView {
             do {
                 let json = try JSONSerialization.jsonObject(with: jsonData!, options: []) as! NSArray
                 let dic = json.firstObject as! [String: String]
-                guard let startLocation = dic["startLocation"],
-                      let endLocation = dic["endLocation"],
+                guard let startLocation = dic["startOffset"],
+                      let endLocation = dic["endOffset"],
                       let content = dic["content"] else {
                           return
                       }
@@ -287,15 +287,12 @@ open class FolioReaderWebView: WKWebView {
 
     func changeHighlightStyle(_ sender: UIMenuController?, style: HighlightStyle) {
         self.folioReader.currentHighlightStyle = style.rawValue
-
+        
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
-            if let updateId = js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") {
-                guard let readerConfig == self?.readerConfig else { return }
-                Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
-
-                //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
-                self?.setMenuVisible(false)
-            }
+            guard error == nil, let updateId = callback as? String, let readerConfig == self?.readerConfig else { return }
+            Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
+            //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
+            self?.setMenuVisible(false)
         }
     }
 
