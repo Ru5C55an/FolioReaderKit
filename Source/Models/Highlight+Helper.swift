@@ -187,7 +187,7 @@ extension Highlight {
     ///   - bookId: Book ID
     ///   - page: Page number
     /// - Returns: Return a list of Highlights
-    public static func allByBookId(withConfiguration readerConfig: FolioReaderConfig, bookId: String, andPage page: NSNumber? = nil) -> [Highlight] {
+    public static func allByBookId(withConfiguration readerConfig: FolioReaderConfig, bookId: String, andPage page: Int? = nil) -> [Highlight] {
         var highlights: [Highlight]?
         var predicate = NSPredicate(format: "bookId = %@", bookId)
         if let page = page {
@@ -289,15 +289,20 @@ extension Highlight {
     ///   - page: The page containing the HTML.
     ///   - highlightId: The ID to be removed
     /// - Returns: The removed id
-    @discardableResult public static func removeFromHTMLById(withinPage page: FolioReaderPage?, highlightId: String) -> String? {
-        guard let currentPage = page else { return nil }
-        
-        if let removedId = currentPage.webView?.js("removeHighlightById('\(highlightId)')") {
-            return removedId
-        } else {
-            print("Error removing Highlight from page")
-            return nil
-        }
+    ///
+    @discardableResult public static func removeFromHTMLById(withinPage page: FolioReaderPage?, , highlightId: String, completionHandler: ((String?) -> Void)? = nil) {
+        guard let currentPage = page else {
+            completionHandler?(nil)
+            return }
+
+        currentPage.webView?.js("removeHighlightById('\(highlightId)')", completionHandler: { (callback, error) in
+            guard error == nil, let removeId = callback as? String else {
+                print("Error removing Highlight from page")
+                completionHandler?(nil)
+                return
+            }
+            completionHandler?(removeId)
+        })
     }
     
     /**
