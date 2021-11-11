@@ -161,7 +161,7 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
             return tempHtmlContent as String
         }
 
-        let highlights = Highlight.allByBookId(withConfiguration: self.readerConfig, bookId: bookId, andPage: pageNumber)
+        let highlights = Highlight.allByBookId(withConfiguration: self.readerConfig, bookId: bookId, andPage: pageNumber as? NSNumber)
 
         if (highlights.count > 0) {
             for item in highlights {
@@ -198,7 +198,7 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
             return
         }
 
-        let highlights = Highlight.allByBookId(withConfiguration: readerConfig, bookId: bookId, andPage: pageNumber)
+        let highlights = Highlight.allByBookId(withConfiguration: readerConfig, bookId: bookId, andPage: pageNumber as? NSNumber)
 
         guard highlights.count > 0 else { return }
         for highlight in highlights {
