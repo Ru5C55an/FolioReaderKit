@@ -13,7 +13,6 @@ open class FRResource: NSObject {
     var properties: String?
     var mediaType: MediaType!
     var mediaOverlay: String?
-    var data: Data!
     
     public var href: String!
     public var fullHref: String!

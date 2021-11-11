@@ -129,7 +129,6 @@ class FREpubParser: NSObject, SSZipArchiveDelegate {
             throw FolioReaderError.fullPathEmpty
         }
         opfResource.mediaType = MediaType.by(fileName: fullPath)
-        opfResource.data = containerData
         book.opfResource = opfResource
         resourcesBasePath = bookBasePath.appendingPathComponent(book.opfResource.href.deletingLastPathComponent)
     }
@@ -139,94 +138,83 @@ class FREpubParser: NSObject, SSZipArchiveDelegate {
     /// - Parameter bookBasePath: The base book path
     /// - Throws: `FolioReaderError`
     private func readOpf() throws {
-        let opfPath = book.opfResource.href
-        var identifier: String?
+        let opfPath = bookBasePath.appendingPathComponent(book.opfResource.href)
+                var identifier: String?
 
-        guard let opfData = (bookZipEntries.first { $0.info.name == opfPath })?.data else {
-            throw FolioReaderError.errorInOpf
-        }
-        let xmlDoc = try AEXMLDocument(xml: opfData)
+                let opfData = try Data(contentsOf: URL(fileURLWithPath: opfPath), options: .alwaysMapped)
+                let xmlDoc = try AEXMLDocument(xml: opfData)
 
-        // Base OPF info
-        if let package = xmlDoc.children.first {
-            identifier = package.attributes["unique-identifier"]
+                // Base OPF info
+                if let package = xmlDoc.children.first {
+                    identifier = package.attributes["unique-identifier"]
 
-            if let version = package.attributes["version"] {
-                book.version = Double(version)
-            }
-        }
+                    if let version = package.attributes["version"] {
+                        book.version = Double(version)
+                    }
+                }
 
-        // initialize EpubCFI class
-        parseCFI(xmlDoc)
+                // Parse and save each "manifest item"
+                xmlDoc.root["manifest"]["item"].all?.forEach {
+                    let resource = FRResource()
+                    resource.id = $0.attributes["id"]
+                    resource.properties = $0.attributes["properties"]
+                    resource.href = $0.attributes["href"]
+                    resource.fullHref = resourcesBasePath.appendingPathComponent(resource.href).removingPercentEncoding
+                    resource.mediaType = MediaType.by(name: $0.attributes["media-type"] ?? "", fileName: resource.href)
+                    resource.mediaOverlay = $0.attributes["media-overlay"]
+                    resource = $0.
 
-        // Parse and save each "manifest item"
-        xmlDoc.root["manifest"]["item"].all?.forEach { item in
-            guard let href = item.attributes["href"], let entry = self.bookZipEntries.first(where: { $0.info.name.contains(href) }) else {
-                return
+                    // if a .smil file is listed in resources, go parse that file now and save it on book model
+                    if (resource.mediaType != nil && resource.mediaType == .smil) {
+                        readSmilFile(resource)
+                    }
 
-            }
-            let resource = FRResource()
-            resource.id = item.attributes["id"]
-            resource.properties = item.attributes["properties"]
-            resource.href = entry.info.name
-            resource.data = entry.data
+                    book.resources.add(resource)
+                }
 
-            // TODO: check this
-            resource.fullHref = resourcesBasePath.appendingPathComponent(resource.href).removingPercentEncoding
-            resource.mediaType = MediaType.by(name: item.attributes["media-type"] ?? "", fileName: resource.href)
-            resource.mediaOverlay = item.attributes["media-overlay"]
+                book.smils.basePath = resourcesBasePath
 
-            // if a .smil file is listed in resources, go parse that file now and save it on book model
-            if (resource.mediaType != nil && resource.mediaType == .smil) {
-                readSmilFile(resource)
-            }
+                // Read metadata
+                book.metadata = readMetadata(xmlDoc.root["metadata"].children)
 
-            book.resources.add(resource)
-        }
+                // Read the book unique identifier
+                if let identifier = identifier, let uniqueIdentifier = book.metadata.find(identifierById: identifier) {
+                    book.uniqueIdentifier = uniqueIdentifier.value
+                }
 
-        book.smils.basePath = resourcesBasePath
+                // Read the cover image
+                let coverImageId = book.metadata.find(byName: "cover")?.content
+                if let coverImageId = coverImageId, let coverResource = book.resources.findById(coverImageId) {
+                    book.coverImage = coverResource
+                } else if let coverResource = book.resources.findByProperty("cover-image") {
+                    book.coverImage = coverResource
+                }
 
-        // Read metadata
-        book.metadata = readMetadata(xmlDoc.root["metadata"].children)
+                // Specific TOC for ePub 2 and 3
+                // Get the first resource with the NCX mediatype
+                if let tocResource = book.resources.findByMediaType(MediaType.ncx) {
+                    book.tocResource = tocResource
+                } else if let tocResource = book.resources.findByExtension(MediaType.ncx.defaultExtension) {
+                    // Non-standard books may use wrong mediatype, fallback with extension
+                    book.tocResource = tocResource
+                } else if let tocResource = book.resources.findByProperty("nav") {
+                    book.tocResource = tocResource
+                }
 
-        // Read the book unique identifier
-        if let identifier = identifier, let uniqueIdentifier = book.metadata.find(identifierById: identifier) {
-            book.uniqueIdentifier = uniqueIdentifier.value
-        }
+                precondition(book.tocResource != nil, "ERROR: Could not find table of contents resource. The book don't have a TOC resource.")
 
-        // Read the cover image
-        let coverImageId = book.metadata.find(byName: "cover")?.content
-        if let coverImageId = coverImageId, let coverResource = book.resources.findById(coverImageId) {
-            book.coverImage = coverResource
-        } else if let coverResource = book.resources.findByProperty("cover-image") {
-            book.coverImage = coverResource
-        }
+                // The book TOC
+                book.tableOfContents = findTableOfContents()
+                book.flatTableOfContents = flatTOC
 
-        // Specific TOC for ePub 2 and 3
-        // Get the first resource with the NCX mediatype
-        if let tocResource = book.resources.findByMediaType(MediaType.ncx) {
-            book.tocResource = tocResource
-        } else if let tocResource = book.resources.findByExtension(MediaType.ncx.defaultExtension) {
-            // Non-standard books may use wrong mediatype, fallback with extension
-            book.tocResource = tocResource
-        } else if let tocResource = book.resources.findByProperty("nav") {
-            book.tocResource = tocResource
-        }
+                // Read Spine
+                let spine = xmlDoc.root["spine"]
+                book.spine = readSpine(spine.children)
 
-        precondition(book.tocResource != nil, "ERROR: Could not find table of contents resource. The book don't have a TOC resource.")
-
-        // The book TOC
-        book.tableOfContents = findTableOfContents()
-        book.flatTableOfContents = flatTOC
-
-        // Read Spine
-        let spine = xmlDoc.root["spine"]
-        book.spine = readSpine(spine.children)
-
-        // Page progress direction `ltr` or `rtl`
-        if let pageProgressionDirection = spine.attributes["page-progression-direction"] {
-            book.spine.pageProgressionDirection = pageProgressionDirection
-        }
+                // Page progress direction `ltr` or `rtl`
+                if let pageProgressionDirection = spine.attributes["page-progression-direction"] {
+                    book.spine.pageProgressionDirection = pageProgressionDirection
+                }
     }
 
     /// Reads and parses a .smil file.
