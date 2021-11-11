@@ -209,13 +209,14 @@ open class FolioReaderWebView: WKWebView {
                       }
                 strongSelf.clearTextSelection()
 
+                guard let html = js("getHTML()") else { return }
                 guard let identifier = dic["id"] else { return }
                 guard let bookId = (strongSelf.book.name as NSString?)?.deletingPathExtension else { return }
 
                 let pageNumber = strongSelf.folioReader.readerCenter?.currentPageNumber ?? 0
                 let match = Highlight.MatchingHighlight(text: html, id: identifier, startOffset: startOffset, endOffset: endOffset, bookId: bookId, currentPage: pageNumber)
                 if let highlight = Highlight.matchHighlight(match) {
-                    self.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
+                    self?.folioReader.readerCenter?.presentAddHighlightNote(highlight, edit: false)
                 }
             } catch {
                 print("Could not receive JSON")
@@ -226,7 +227,7 @@ open class FolioReaderWebView: WKWebView {
     @objc func updateHighlightNote(_ sender: UIMenuController?) {
         js("getHighlightId()") { [weak self] (callback, error) in
             guard error == nil,
-                  let highlightId = callback as? Stringm let readerConfig = self?.readerConfig else { return }
+                  let highlightId = callback as? String, let readerConfig = self?.readerConfig else { return }
             guard let highlightNote = Highlight.getById(withConfiguration: readerConfig, highlightId: highlightId) else { return }
             self?.folioReader.readerCenter?.presentAddHighlightNote(highlightNote, edit: true)
         }
@@ -278,7 +279,7 @@ open class FolioReaderWebView: WKWebView {
         self.folioReader.currentHighlightStyle = style.rawValue
 
         js("setHighlightStyle('\(HighlightStyle.classForStyle(style.rawValue))')") { [weak self] (callback, error) in
-            guard error == nil, let updateId = callback as? String, let readerConfig == self?.readerConfig else { return }
+            guard error == nil, let updateId = callback as? String, let readerConfig = self?.readerConfig else { return }
             Highlight.updateById(withConfiguration: readerConfig, highlightId: updateId, type: style)
             //FIX: https://github.com/FolioReader/FolioReaderKit/issues/316
             self?.setMenuVisible(false)
