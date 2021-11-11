@@ -81,10 +81,10 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
         if webView == nil {
             webView = FolioReaderWebView(frame: webViewFrame(), readerContainer: readerContainer)
             webView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            webView?.dataDetectorTypes = .link
             webView?.scrollView.showsVerticalScrollIndicator = false
             webView?.scrollView.showsHorizontalScrollIndicator = false
             webView?.backgroundColor = .clear
+            webView?.isOpaque = false
             self.contentView.addSubview(webView!)
         }
         webView?.navigationDelegate = self
@@ -111,7 +111,7 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
 
     deinit {
         webView?.scrollView.delegate = nil
-        webView?.delegate = nil
+        webView?.navigationDelegate = nil
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -189,6 +189,24 @@ open class FolioReaderPage: UICollectionViewCell, WKNavigationDelegate, UIGestur
             }
         }
         return tempHtmlContent as String
+    }
+
+    // MARK: - Highlights
+    fileprivate func insertHighlights() {
+        // Restore highlights
+        guard let bookId = (self.book.name as NSString?)?.deletingPathExtension else {
+            return
+        }
+
+        let highlights = Highlight.allByBookId(withConfiguration: readerConfig, bookId: bookId, andPage: pageNumber)
+
+        guard highlights.count > 0 else { return }
+        for highlight in highlights {
+            let style = HighlightStyle.classForStyle(highlight.type)
+
+            let onClickAction = highlight.noteForHighlight == nil ? "callHighlightURL(this);" : "callHighlightWithNoteURL(this);"
+            webView?.js("recreateHighlight('\(highlight.id)','\(style)','\(onClickAction)','\(highlight.startLocation)','\(highlight.endLocation)')")
+        }
     }
 
     // MARK: - WKWebView Delegate
