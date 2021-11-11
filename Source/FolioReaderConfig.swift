@@ -221,6 +221,7 @@ open class FolioReaderConfig: NSObject {
     open var localizedShareTextQuote = NSLocalizedString("Share text quote", comment: "")
     open var localizedSave = NSLocalizedString("Save", comment: "")
     open var localizedHighlightNote = NSLocalizedString("Note", comment: "")
+    open var localizedPercentageOfBookCompleted = NSLocalizedString("book completed", comment: "")
 
     public convenience init(withIdentifier identifier: String) {
         self.init()

@@ -851,6 +851,40 @@ open class FolioReaderCenter: UIViewController, UICollectionViewDelegate, UIColl
         
         return webViewPage
     }
+
+    public var getGlobalReadingProgress: Double {
+        let allChapterResources = book.spine.spineReferences
+
+        let totalCharacterSize = allChapterResources.reduce(0) { (result: Int, currentSpine: Spine) -> Int in
+            let html = String(data: currentSpine.resource.data, encoding: .utf8)
+            return result + (html?.count ?? 0)
+        }
+
+        guard let currentChapterIndex = folioReader.readerCenter?.currentPage?.pageNumber, currentChapterIndex > 0 else { return 0.0 }
+        var progressCharacterSize = 0
+        for i in 0..<(currentChapterIndex - 1) {
+            guard let currentResouce = book.spine.spineReferences[i].resource.data,
+                let html = String(data: currentResouce, encoding: .utf8) else {
+                return 0.0
+            }
+            progressCharacterSize += html.count
+        }
+        guard totalCharacterSize > 0 else { return 0.0 }
+        let totalProgressGivenCurrentChapter = Double(progressCharacterSize) / Double(totalCharacterSize)
+
+        guard let htmlData = book.spine.spineReferences[currentChapterIndex - 1].resource.data,
+            let currentChapterSize = String(data: htmlData , encoding: .utf8)?.count else {
+            return 0.0
+        }
+        let chapterPercentage = Double(currentChapterSize) / Double(totalCharacterSize)
+
+        let totalPage = folioReader.readerCenter?.pageIndicatorView?.totalPages ?? 0
+        let currentPage = folioReader.readerCenter?.pageIndicatorView?.currentPage ?? 0
+        guard totalPage > 0 else { return 0.0 }
+        let currentChapterPagePercentage = Double(currentPage) / Double(totalPage)
+        let currentProgress = totalProgressGivenCurrentChapter + chapterPercentage * currentChapterPagePercentage
+        return currentProgress
+    }
     
     public func getCurrentPageProgress() -> Float {
         guard let page = currentPage else { return 0 }
