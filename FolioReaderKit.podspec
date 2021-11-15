@@ -21,6 +21,7 @@ Pod::Spec.new do |s|
     'Source/*.{h,swift}',
     'Source/**/*.swift',
     'Vendor/**/*.swift',
+    'Source/**/Localizable.strings'.
   ]
   s.resources = [
     'Source/**/*.{js,css}',
