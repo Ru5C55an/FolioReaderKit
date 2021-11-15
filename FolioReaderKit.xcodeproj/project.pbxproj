@@ -267,6 +267,7 @@
 				1A958F241D397BE900D56699 /* PageViewController.swift */,
 				1A65DDD41DA744410033C277 /* QuoteImage.swift */,
 				1A958F901D397BE900D56699 /* ScrollScrubber.swift */,
+				440468572742CC1800D07DF6 /* Localizable.strings */,
 			);
 			path = Source;
 			sourceTree = SOURCE_ROOT;
@@ -391,7 +392,6 @@
 				B0D69B501D0365AC003B4CCD /* Frameworks */,
 				B0D6990E1D035FA2003B4CCD /* FolioReaderKit.h */,
 				B0D699101D035FA2003B4CCD /* Info.plist */,
-				440468572742CC1800D07DF6 /* Localizable.strings */,
 			);
 			path = FolioReaderKit;
 			sourceTree = "<group>";
